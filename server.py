@@ -25,9 +25,12 @@ db = client[os.environ['DB_NAME']]
 # Create the main app without a prefix
 app = FastAPI()
 
+# Get allowed origins from environment
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # your frontend
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1552,6 +1555,27 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
+@api_router.get("/")
+async def root():
+    return {
+        "message": "OEH TRADERS API v2.0 - B2B Platform with User Auth & Quote System",
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        await db.command("ping")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database connection failed: {str(e)}")
+
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -1574,6 +1598,7 @@ logger = logging.getLogger(__name__)
 async def shutdown_db_client():
     client.close()
 
+# Add this at the very end of server.py
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -1583,4 +1608,4 @@ if __name__ == "__main__":
         port=port, 
         reload=False,  # Disable auto-reload in production
         access_log=True
-    )
+    )   
