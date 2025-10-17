@@ -1,0 +1,14 @@
+.git
+.gitignore
+README.md
+.env.local
+.env.production
+*.pyc
+__pycache__
+*.sqlite3
+.DS_Store
+.coverage
+htmlcov/
+.pytest_cache/
+.venv
+venv/
