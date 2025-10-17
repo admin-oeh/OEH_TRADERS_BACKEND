@@ -1,0 +1,14 @@
+{
+  "packages": {
+    "python": "3.11"
+  },
+  "copy": [
+    "server.py",
+    "requirements.txt",
+    ".env"
+  ],
+  "scripts": {
+    "build": "pip install -r requirements.txt",
+    "start": "uvicorn server:app --host 0.0.0.0 --port 8000"
+  }
+}
