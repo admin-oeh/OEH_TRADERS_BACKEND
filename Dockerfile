@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies including curl for health check
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -27,5 +27,5 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Use shell form for CMD to handle environment variables properly
-CMD uvicorn server:app --host 0.0.0.0 --port 8000 --access-log
+# Start the application
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--access-log"]

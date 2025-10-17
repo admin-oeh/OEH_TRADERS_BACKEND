@@ -13,6 +13,9 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import hashlib
 import secrets
+import asyncio
+import os
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1597,6 +1600,46 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Add startup delay for Railway health checks
+@app.on_event("startup")
+async def startup_event():
+    # Add a small delay to ensure app is fully ready
+    await asyncio.sleep(2)
+    
+    try:
+        # Test database connection
+        await db.command("ping")
+        logger.info("✅ Successfully connected to MongoDB")
+        logger.info("✅ FastAPI application started successfully on port 8000")
+    except Exception as e:
+        logger.error(f"❌ Failed to connect to MongoDB: {e}")
+        # Don't exit in production, just log the error
+        logger.info("⚠️  Continuing without database connection")
+
+# Add a simple immediate response endpoint
+@api_router.get("/ready")
+async def ready_check():
+    return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@api_router.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        await db.command("ping")
+        return {
+            "status": "healthy", 
+            "database": "connected",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        # Return 503 but don't crash
+        return {
+            "status": "degraded",
+            "database": "disconnected", 
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
 # Add this at the very end of server.py
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Wait for network to be ready
-sleep 5
+# Wait a moment for the container to fully start
+sleep 3
 
 # Start the application
 echo "Starting FastAPI application..."
