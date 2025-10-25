@@ -89,6 +89,7 @@ class Product(BaseModel):
     weight: Optional[str] = None
     dimensions: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ProductCreate(BaseModel):
     name: str
@@ -108,6 +109,27 @@ class ProductCreate(BaseModel):
     features: List[str] = []
     tags: List[str] = []
     is_restricted: bool = False
+    weight: Optional[str] = None
+    dimensions: Optional[str] = None
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    original_price: Optional[float] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    brand: Optional[str] = None
+    image_url: Optional[str] = None
+    gallery_images: Optional[List[str]] = None
+    rating: Optional[float] = None
+    review_count: Optional[int] = None
+    in_stock: Optional[bool] = None
+    stock_quantity: Optional[int] = None
+    specifications: Optional[dict] = None
+    features: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    is_restricted: Optional[bool] = None
     weight: Optional[str] = None
     dimensions: Optional[str] = None
 
@@ -1057,6 +1079,136 @@ async def get_admin_stats(current_admin: Admin = Depends(get_current_admin)):
         "chat_messages": await db.chat_messages.count_documents({})
     }
     return stats
+
+# ADMIN PRODUCT MANAGEMENT ENDPOINTS
+@api_router.post("/admin/products", response_model=Product)
+async def create_product(product_data: ProductCreate, current_admin: Admin = Depends(get_current_admin)):
+    """Create a new product (Admin only)"""
+    try:
+        # Generate product ID and timestamps
+        product_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        # Create product object
+        product = Product(
+            id=product_id,
+            **product_data.dict(),
+            created_at=now,
+            updated_at=now
+        )
+        
+        # Insert into database
+        await db.products.insert_one(product.dict())
+        
+        return product
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create product: {str(e)}"
+        )
+
+@api_router.put("/admin/products/{product_id}", response_model=Product)
+async def update_product(product_id: str, product_data: ProductUpdate, current_admin: Admin = Depends(get_current_admin)):
+    """Update an existing product (Admin only)"""
+    try:
+        # Check if product exists
+        existing_product = await db.products.find_one({"id": product_id})
+        if not existing_product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Prepare update data
+        update_data = product_data.dict(exclude_unset=True)
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        
+        # Update product in database
+        await db.products.update_one(
+            {"id": product_id},
+            {"$set": update_data}
+        )
+        
+        # Return updated product
+        updated_product = await db.products.find_one({"id": product_id})
+        return Product(**updated_product)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update product: {str(e)}"
+        )
+
+@api_router.delete("/admin/products/{product_id}")
+async def delete_product(product_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Delete a product (Admin only)"""
+    try:
+        # Check if product exists
+        existing_product = await db.products.find_one({"id": product_id})
+        if not existing_product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Delete product from database
+        result = await db.products.delete_one({"id": product_id})
+        
+        if result.deleted_count == 1:
+            return {"message": "Product deleted successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete product"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete product: {str(e)}"
+        )
+
+@api_router.get("/admin/products")
+async def get_all_products_admin(
+    current_admin: Admin = Depends(get_current_admin),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, le=100)
+):
+    """Get all products with pagination (Admin only)"""
+    try:
+        products = await db.products.find().skip(skip).limit(limit).to_list(length=None)
+        total_count = await db.products.count_documents({})
+        
+        return {
+            "products": [Product(**product) for product in products],
+            "total_count": total_count,
+            "skip": skip,
+            "limit": limit
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch products: {str(e)}"
+        )
+
+@api_router.get("/admin/products/{product_id}", response_model=Product)
+async def get_product_admin(product_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Get product details (Admin only)"""
+    try:
+        product = await db.products.find_one({"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        return Product(**product)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch product: {str(e)}"
+        )
+
 @api_router.post("/cart/add")
 async def add_to_cart(request: AddToCartRequest, current_user: User = Depends(get_current_user)):
     # Check if product exists and is in stock
@@ -1641,7 +1793,6 @@ async def health_check():
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-# Add this at the very end of server.py
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -1649,6 +1800,6 @@ if __name__ == "__main__":
         "server:app", 
         host="0.0.0.0", 
         port=port, 
-        reload=False,  # Disable auto-reload in production
+        reload=False,
         access_log=True
-    )   
+    )
