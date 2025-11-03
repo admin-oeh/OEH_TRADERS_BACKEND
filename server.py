@@ -141,6 +141,16 @@ class Category(BaseModel):
     image_url: str
     product_count: int = 0
 
+class CategoryCreate(BaseModel):
+    name: str
+    description: str
+    image_url: str
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
 class CategoryWithCount(BaseModel):
     id: str
     name: str
@@ -154,6 +164,18 @@ class Brand(BaseModel):
     name: str
     logo_url: str
     description: str
+    website: Optional[str] = None
+
+class BrandCreate(BaseModel):
+    name: str
+    logo_url: str
+    description: str
+    website: Optional[str] = None
+
+class BrandUpdate(BaseModel):
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
+    description: Optional[str] = None
     website: Optional[str] = None
 
 class BrandWithCount(BaseModel):
@@ -436,250 +458,34 @@ async def get_current_dealer(credentials: HTTPAuthorizationCredentials = Depends
     
     return Dealer(**dealer)
 
-# Initialize sample data
-@api_router.post("/initialize-data")
-async def initialize_sample_data():
-    # Clear existing data
-    await db.products.delete_many({})
-    await db.categories.delete_many({})
-    await db.brands.delete_many({})
+# Initialize empty collections
+@api_router.post("/initialize-collections")
+async def initialize_collections():
+    """Initialize empty collections for the application"""
+    # Create empty collections with proper indexes
+    collections = ["products", "categories", "brands", "users", "dealers", "admins", "quotes", "chat_messages", "carts", "status_checks"]
     
-    # Sample categories
-    categories = [
-        {
-            "name": "Body Armor & Protection",
-            "slug": "body-armor",
-            "description": "Professional body armor, plates, and protective gear",
-            "image_url": "https://images.unsplash.com/photo-1704278483976-9cca15325bc0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwzfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85"
-        },
-        {
-            "name": "Tactical Apparel",
-            "slug": "tactical-apparel", 
-            "description": "Uniforms, boots, gloves, and tactical clothing",
-            "image_url": "https://images.unsplash.com/photo-1705564667318-923901fb916a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85"
-        },
-        {
-            "name": "Tactical Gear & Equipment",
-            "slug": "tactical-gear",
-            "description": "Backpacks, pouches, holsters, and tactical accessories",
-            "image_url": "https://images.unsplash.com/photo-1714384716870-6d6322bf5a7f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwxfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85"
-        },
-        {
-            "name": "Optics & Scopes",
-            "slug": "optics",
-            "description": "Red dots, scopes, night vision, and optical equipment",
-            "image_url": "https://images.unsplash.com/photo-1704278483831-c3939b1b041b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHw0fHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85"
-        },
-        {
-            "name": "Weapons & Accessories",
-            "slug": "weapons",
-            "description": "Firearms, magazines, and weapon accessories",
-            "image_url": "https://images.pexels.com/photos/78783/submachine-gun-rifle-automatic-weapon-weapon-78783.jpeg"
-        },
-        {
-            "name": "Training & Simulation",
-            "slug": "training",
-            "description": "Training equipment and simulation gear",
-            "image_url": "https://images.unsplash.com/photo-1637252166739-b47f8875f304?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxtaWxpdGFyeSUyMGVxdWlwbWVudHxlbnwwfHx8fDE3NTczNzYwMDd8MA&ixlib=rb-4.1.0&q=85"
-        }
-    ]
+    for collection_name in collections:
+        if collection_name not in await db.list_collection_names():
+            await db.create_collection(collection_name)
     
-    for cat in categories:
-        category = Category(**cat)
-        await db.categories.insert_one(category.dict())
+    # Create indexes for better performance
+    await db.products.create_index([("category", 1)])
+    await db.products.create_index([("brand", 1)])
+    await db.products.create_index([("price", 1)])
+    await db.products.create_index([("in_stock", 1)])
+    await db.categories.create_index([("slug", 1)], unique=True)
+    await db.brands.create_index([("name", 1)], unique=True)
+    await db.users.create_index([("email", 1)], unique=True)
+    await db.dealers.create_index([("email", 1)], unique=True)
+    await db.admins.create_index([("email", 1)], unique=True)
+    await db.admins.create_index([("username", 1)], unique=True)
+    await db.quotes.create_index([("user_id", 1)])
+    await db.quotes.create_index([("status", 1)])
+    await db.chat_messages.create_index([("user_id", 1)])
+    await db.carts.create_index([("user_id", 1)], unique=True)
     
-    # Sample brands with tactical logo placeholders
-    brands = [
-        {"name": "5.11 Tactical", "logo_url": "https://images.unsplash.com/photo-1753723883109-a575c639c0a3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwyfHx0YWN0aWNhbCUyMGdlYXIlMjBsb2dvc3xlbnwwfHx8fDE3NTgwMDMyNTF8MA&ixlib=rb-4.1.0&q=85", "description": "Professional tactical gear and apparel"},
-        {"name": "Blackhawk", "logo_url": "https://images.unsplash.com/photo-1636136370671-7ec07f284a2f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHx0YWN0aWNhbHxlbnwwfHx8fDE3NTgwMDMyNzR8MA&ixlib=rb-4.1.0&q=85", "description": "Military and law enforcement equipment"},
-        {"name": "Crye Precision", "logo_url": "https://images.unsplash.com/photo-1655706443789-7682c46bcb8b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxtaWxpdGFyeSUyMGxvZ29zfGVufDB8fHx8MTc1ODAwMzI3MHww&ixlib=rb-4.1.0&q=85", "description": "Advanced combat systems and gear"},
-        {"name": "Oakley SI", "logo_url": "https://images.unsplash.com/photo-1711097658585-73d97ef42bf6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxtaWxpdGFyeSUyMGxvZ29zfGVufDB8fHx8MTc1ODAwMzI3MHww&ixlib=rb-4.1.0&q=85", "description": "Standard Issue tactical eyewear and gear"},
-        {"name": "Condor Outdoor", "logo_url": "https://via.placeholder.com/200x80/2d2d2d/ffffff?text=CONDOR+TACTICAL", "description": "Tactical gear and outdoor equipment"},
-        {"name": "Ops-Core", "logo_url": "https://via.placeholder.com/200x80/1a1a1a/ffffff?text=OPS-CORE", "description": "Advanced helmet and protection systems"},
-        {"name": "Safariland", "logo_url": "https://via.placeholder.com/200x80/333333/ffffff?text=SAFARILAND", "description": "Law enforcement holsters and duty gear"},
-        {"name": "Mechanix Wear", "logo_url": "https://via.placeholder.com/200x80/dc2626/ffffff?text=MECHANIX", "description": "Professional work and tactical gloves"}
-    ]
-    
-    for brand in brands:
-        brand_obj = Brand(**brand)
-        await db.brands.insert_one(brand_obj.dict())
-    
-    # Sample products with varied stock status
-    products = [
-        {
-            "name": "Tactical Plate Carrier Vest",
-            "description": "Professional-grade plate carrier with MOLLE webbing system. Designed for military and law enforcement use.",
-            "price": 299.99,
-            "original_price": 399.99,
-            "category": "Body Armor & Protection",
-            "subcategory": "Plate Carriers",
-            "brand": "5.11 Tactical",
-            "image_url": "https://images.unsplash.com/photo-1704278483976-9cca15325bc0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwzfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.8,
-            "review_count": 156,
-            "in_stock": True,
-            "stock_quantity": 25,
-            "features": ["MOLLE Compatible", "Adjustable Shoulder Straps", "Quick Release System", "Drag Handle"],
-            "tags": ["tactical", "military", "law-enforcement", "protection"],
-            "specifications": {"Material": "1000D Cordura", "Weight": "2.1 lbs", "Size": "One Size Fits Most"},
-            "weight": "2.1 lbs"
-        },
-        {
-            "name": "Combat Tactical Boots",
-            "description": "Durable tactical boots designed for extreme conditions. Waterproof and slip-resistant.",
-            "price": 189.99,
-            "category": "Tactical Apparel",
-            "subcategory": "Boots",
-            "brand": "5.11 Tactical",
-            "image_url": "https://images.unsplash.com/photo-1705564667318-923901fb916a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.6,
-            "review_count": 89,
-            "in_stock": True,
-            "stock_quantity": 50,
-            "features": ["Waterproof", "Slip-Resistant Sole", "Breathable Lining", "Reinforced Toe"],
-            "tags": ["boots", "tactical", "waterproof", "military"],
-            "specifications": {"Material": "Full-grain leather", "Height": "8 inches", "Weight": "2.5 lbs per pair"}
-        },
-        {
-            "name": "Tactical Assault Backpack",
-            "description": "3-day assault pack with multiple compartments and MOLLE attachment points.",
-            "price": 129.99,
-            "original_price": 169.99,
-            "category": "Tactical Gear & Equipment",
-            "subcategory": "Backpacks",
-            "brand": "Blackhawk",
-            "image_url": "https://images.unsplash.com/photo-1714384716870-6d6322bf5a7f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwxfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.7,
-            "review_count": 234,
-            "in_stock": True,
-            "stock_quantity": 15,
-            "features": ["40L Capacity", "MOLLE Compatible", "Hydration Ready", "Reinforced Bottom"],
-            "tags": ["backpack", "tactical", "molle", "assault-pack"],
-            "specifications": {"Capacity": "40L", "Material": "600D Polyester", "Dimensions": "19x13x8 inches"}
-        },
-        {
-            "name": "Red Dot Sight Optic",
-            "description": "Professional red dot sight with unlimited eye relief and parallax-free performance.",
-            "price": 449.99,
-            "category": "Optics & Scopes",
-            "subcategory": "Red Dot Sights",
-            "brand": "Ops-Core",
-            "image_url": "https://images.unsplash.com/photo-1704278483831-c3939b1b041b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHw0fHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.9,
-            "review_count": 67,
-            "in_stock": True,
-            "stock_quantity": 8,
-            "features": ["Parallax Free", "Unlimited Eye Relief", "Shockproof", "Waterproof"],
-            "tags": ["optics", "red-dot", "tactical", "precision"],
-            "is_restricted": True,
-            "specifications": {"Battery Life": "50,000 hours", "Weight": "0.8 lbs", "Mount": "Picatinny Rail"}
-        },
-        {
-            "name": "Tactical Combat Uniform Set",
-            "description": "Complete ACU uniform set with reinforced knees and elbows. Flame resistant fabric.",
-            "price": 89.99,
-            "category": "Tactical Apparel",
-            "subcategory": "Uniforms",
-            "brand": "Crye Precision",
-            "image_url": "https://images.pexels.com/photos/33812346/pexels-photo-33812346.jpeg",
-            "rating": 4.5,
-            "review_count": 178,
-            "in_stock": True,
-            "stock_quantity": 35,
-            "features": ["Flame Resistant", "Reinforced Knees", "Multiple Pockets", "Adjustable Cuffs"],
-            "tags": ["uniform", "tactical", "flame-resistant", "combat"],
-            "specifications": {"Material": "50/50 NYCO", "Colors": "Multicam, OCP", "Sizes": "XS-3XL"}
-        },
-        {
-            "name": "Ballistic Helmet System",
-            "description": "Advanced combat helmet with NVG mount and accessory rails. NIJ Level IIIA protection.",
-            "price": 899.99,
-            "category": "Body Armor & Protection",
-            "subcategory": "Helmets",
-            "brand": "Ops-Core",
-            "image_url": "https://images.pexels.com/photos/33819675/pexels-photo-33819675.jpeg",
-            "rating": 4.9,
-            "review_count": 45,
-            "in_stock": False,  # Out of stock
-            "stock_quantity": 0,
-            "features": ["NIJ Level IIIA", "NVG Mount", "Accessory Rails", "Comfort Padding"],
-            "tags": ["helmet", "ballistic", "protection", "tactical"],
-            "is_restricted": True,
-            "specifications": {"Protection Level": "NIJ Level IIIA", "Weight": "3.2 lbs", "Shell": "Carbon Fiber"}
-        },
-        {
-            "name": "Tactical Knee Pads",
-            "description": "Professional knee protection for tactical operations. Comfortable and durable.",
-            "price": 39.99,
-            "category": "Body Armor & Protection",
-            "subcategory": "Protective Gear",
-            "brand": "Blackhawk",
-            "image_url": "https://images.pexels.com/photos/33759979/pexels-photo-33759979.jpeg",
-            "rating": 4.4,
-            "review_count": 312,
-            "in_stock": True,
-            "stock_quantity": 100,
-            "features": ["Adjustable Straps", "Non-slip Design", "Durable Padding", "Lightweight"],
-            "tags": ["knee-pads", "protection", "tactical", "gear"],
-            "specifications": {"Material": "Neoprene & Nylon", "Weight": "0.8 lbs", "Size": "Adjustable"}
-        },
-        {
-            "name": "Night Vision Monocular",
-            "description": "Gen 3 night vision monocular for tactical operations. High-resolution imaging.",
-            "price": 2499.99,
-            "category": "Optics & Scopes",
-            "subcategory": "Night Vision",
-            "brand": "Ops-Core",
-            "image_url": "https://images.unsplash.com/photo-1549563793-ae7c90155169?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHw0fHxtaWxpdGFyeSUyMGVxdWlwbWVudHxlbnwwfHx8fDE3NTczNjAwMDd8MA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.8,
-            "review_count": 23,
-            "in_stock": False,  # Out of stock
-            "stock_quantity": 0,
-            "features": ["Gen 3 Tube", "Auto-Gated", "High Resolution", "Durable Housing"],
-            "tags": ["night-vision", "optics", "tactical", "surveillance"],
-            "is_restricted": True,
-            "specifications": {"Generation": "Gen 3", "Resolution": "64 lp/mm", "Weight": "1.2 lbs"}
-        },
-        # Additional products for better filtering testing
-        {
-            "name": "Tactical Gloves Pro",
-            "description": "Professional tactical gloves with reinforced palm and fingertips.",
-            "price": 45.99,
-            "category": "Tactical Apparel",
-            "subcategory": "Gloves",
-            "brand": "Condor Outdoor",
-            "image_url": "https://images.unsplash.com/photo-1705564667318-923901fb916a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHx0YWN0aWNhbCUyMGdlYXJ8ZW58MHx8fHwxNzU3Mzc1OTk5fDA&ixlib=rb-4.1.0&q=85",
-            "rating": 4.3,
-            "review_count": 156,
-            "in_stock": True,
-            "stock_quantity": 75,
-            "features": ["Reinforced Palm", "Touchscreen Compatible", "Breathable", "Durable"],
-            "tags": ["gloves", "tactical", "protection"],
-            "specifications": {"Material": "Synthetic Leather", "Sizes": "S-XL"}
-        },
-        {
-            "name": "Weapon Cleaning Kit",
-            "description": "Comprehensive cleaning kit for tactical weapons maintenance.",
-            "price": 59.99,
-            "category": "Weapons & Accessories",
-            "subcategory": "Maintenance",
-            "brand": "Oakley SI",
-            "image_url": "https://images.pexels.com/photos/78783/submachine-gun-rifle-automatic-weapon-weapon-78783.jpeg",
-            "rating": 4.6,
-            "review_count": 89,
-            "in_stock": True,
-            "stock_quantity": 30,
-            "features": ["Multi-Caliber", "Portable Case", "Quality Tools", "Instructions"],
-            "tags": ["cleaning", "maintenance", "weapons"],
-            "specifications": {"Compatible": "Multiple Calibers", "Weight": "1.5 lbs"}
-        }
-    ]
-    
-    for product in products:
-        product_obj = Product(**product)
-        await db.products.insert_one(product_obj.dict())
-    
-    return {"message": "Sample data initialized successfully"}
+    return {"message": "Collections initialized successfully with indexes"}
 
 # Sample Users Creation Endpoint
 @api_router.post("/create-sample-users")
@@ -1076,15 +882,342 @@ async def get_admin_stats(current_admin: Admin = Depends(get_current_admin)):
         "pending_quotes": await db.quotes.count_documents({"status": "pending"}),
         "approved_quotes": await db.quotes.count_documents({"status": "approved"}),
         "total_products": await db.products.count_documents({}),
+        "total_categories": await db.categories.count_documents({}),
+        "total_brands": await db.brands.count_documents({}),
         "chat_messages": await db.chat_messages.count_documents({})
     }
     return stats
+
+# ADMIN CATEGORY MANAGEMENT ENDPOINTS
+@api_router.post("/admin/categories", response_model=Category)
+async def create_category(category_data: CategoryCreate, current_admin: Admin = Depends(get_current_admin)):
+    """Create a new category (Admin only)"""
+    try:
+        # Generate slug from name
+        slug = category_data.name.lower().replace(' ', '-').replace('&', 'and')
+        
+        # Check if category with same slug already exists
+        existing_category = await db.categories.find_one({"slug": slug})
+        if existing_category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category with similar name already exists"
+            )
+        
+        # Create category object
+        category = Category(
+            name=category_data.name,
+            slug=slug,
+            description=category_data.description,
+            image_url=category_data.image_url
+        )
+        
+        # Insert into database
+        await db.categories.insert_one(category.dict())
+        
+        return category
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create category: {str(e)}"
+        )
+
+@api_router.get("/admin/categories", response_model=List[Category])
+async def get_all_categories_admin(
+    current_admin: Admin = Depends(get_current_admin),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, le=100),
+    search: Optional[str] = None
+):
+    """Get all categories with pagination and search (Admin only)"""
+    try:
+        filter_query = {}
+        if search:
+            filter_query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}}
+            ]
+        
+        categories = await db.categories.find(filter_query).skip(skip).limit(limit).to_list(length=None)
+        
+        # Return the list directly (not wrapped in an object)
+        return [Category(**category) for category in categories]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch categories: {str(e)}"
+        )
+
+@api_router.get("/admin/categories/{category_id}", response_model=Category)
+async def get_category_admin(category_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Get category details (Admin only)"""
+    try:
+        category = await db.categories.find_one({"id": category_id})
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        
+        return Category(**category)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch category: {str(e)}"
+        )
+
+@api_router.put("/admin/categories/{category_id}", response_model=Category)
+async def update_category(category_id: str, category_data: CategoryUpdate, current_admin: Admin = Depends(get_current_admin)):
+    """Update an existing category (Admin only)"""
+    try:
+        # Check if category exists
+        existing_category = await db.categories.find_one({"id": category_id})
+        if not existing_category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        
+        # Prepare update data
+        update_data = category_data.dict(exclude_unset=True)
+        
+        # Update slug if name is being updated
+        if category_data.name:
+            slug = category_data.name.lower().replace(' ', '-').replace('&', 'and')
+            # Check if new slug conflicts with other categories
+            existing_slug = await db.categories.find_one({"slug": slug, "id": {"$ne": category_id}})
+            if existing_slug:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Category with similar name already exists"
+                )
+            update_data["slug"] = slug
+        
+        # Update category in database
+        await db.categories.update_one(
+            {"id": category_id},
+            {"$set": update_data}
+        )
+        
+        # Return updated category
+        updated_category = await db.categories.find_one({"id": category_id})
+        return Category(**updated_category)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update category: {str(e)}"
+        )
+
+@api_router.delete("/admin/categories/{category_id}")
+async def delete_category(category_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Delete a category (Admin only)"""
+    try:
+        # Check if category exists
+        existing_category = await db.categories.find_one({"id": category_id})
+        if not existing_category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        
+        # Check if category has products
+        product_count = await db.products.count_documents({"category": existing_category["name"]})
+        if product_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete category with {product_count} products. Please reassign or delete products first."
+            )
+        
+        # Delete category from database
+        result = await db.categories.delete_one({"id": category_id})
+        
+        if result.deleted_count == 1:
+            return {"message": "Category deleted successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete category"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete category: {str(e)}"
+        )
+
+# ADMIN BRAND MANAGEMENT ENDPOINTS
+@api_router.post("/admin/brands", response_model=Brand)
+async def create_brand(brand_data: BrandCreate, current_admin: Admin = Depends(get_current_admin)):
+    """Create a new brand (Admin only)"""
+    try:
+        # Check if brand with same name already exists
+        existing_brand = await db.brands.find_one({"name": brand_data.name})
+        if existing_brand:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Brand with this name already exists"
+            )
+        
+        # Create brand object
+        brand = Brand(**brand_data.dict())
+        
+        # Insert into database
+        await db.brands.insert_one(brand.dict())
+        
+        return brand
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create brand: {str(e)}"
+        )
+
+@api_router.get("/admin/brands", response_model=List[Brand])
+async def get_all_brands_admin(
+    current_admin: Admin = Depends(get_current_admin),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, le=100),
+    search: Optional[str] = None
+):
+    """Get all brands with pagination and search (Admin only)"""
+    try:
+        filter_query = {}
+        if search:
+            filter_query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}}
+            ]
+        
+        brands = await db.brands.find(filter_query).skip(skip).limit(limit).to_list(length=None)
+        
+        # Return the list directly (not wrapped in an object)
+        return [Brand(**brand) for brand in brands]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch brands: {str(e)}"
+        )
+
+@api_router.get("/admin/brands/{brand_id}", response_model=Brand)
+async def get_brand_admin(brand_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Get brand details (Admin only)"""
+    try:
+        brand = await db.brands.find_one({"id": brand_id})
+        if not brand:
+            raise HTTPException(status_code=404, detail="Brand not found")
+        
+        return Brand(**brand)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch brand: {str(e)}"
+        )
+
+@api_router.put("/admin/brands/{brand_id}", response_model=Brand)
+async def update_brand(brand_id: str, brand_data: BrandUpdate, current_admin: Admin = Depends(get_current_admin)):
+    """Update an existing brand (Admin only)"""
+    try:
+        # Check if brand exists
+        existing_brand = await db.brands.find_one({"id": brand_id})
+        if not existing_brand:
+            raise HTTPException(status_code=404, detail="Brand not found")
+        
+        # Check if name conflict with other brands
+        if brand_data.name:
+            existing_name = await db.brands.find_one({"name": brand_data.name, "id": {"$ne": brand_id}})
+            if existing_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Brand with this name already exists"
+                )
+        
+        # Prepare update data
+        update_data = brand_data.dict(exclude_unset=True)
+        
+        # Update brand in database
+        await db.brands.update_one(
+            {"id": brand_id},
+            {"$set": update_data}
+        )
+        
+        # Return updated brand
+        updated_brand = await db.brands.find_one({"id": brand_id})
+        return Brand(**updated_brand)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update brand: {str(e)}"
+        )
+
+@api_router.delete("/admin/brands/{brand_id}")
+async def delete_brand(brand_id: str, current_admin: Admin = Depends(get_current_admin)):
+    """Delete a brand (Admin only)"""
+    try:
+        # Check if brand exists
+        existing_brand = await db.brands.find_one({"id": brand_id})
+        if not existing_brand:
+            raise HTTPException(status_code=404, detail="Brand not found")
+        
+        # Check if brand has products
+        product_count = await db.products.count_documents({"brand": existing_brand["name"]})
+        if product_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete brand with {product_count} products. Please reassign or delete products first."
+            )
+        
+        # Delete brand from database
+        result = await db.brands.delete_one({"id": brand_id})
+        
+        if result.deleted_count == 1:
+            return {"message": "Brand deleted successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete brand"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete brand: {str(e)}"
+        )
 
 # ADMIN PRODUCT MANAGEMENT ENDPOINTS
 @api_router.post("/admin/products", response_model=Product)
 async def create_product(product_data: ProductCreate, current_admin: Admin = Depends(get_current_admin)):
     """Create a new product (Admin only)"""
     try:
+        # Validate category exists
+        category = await db.categories.find_one({"name": product_data.category})
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Category '{product_data.category}' does not exist"
+            )
+        
+        # Validate brand exists
+        brand = await db.brands.find_one({"name": product_data.brand})
+        if not brand:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Brand '{product_data.brand}' does not exist"
+            )
+        
         # Generate product ID and timestamps
         product_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -1102,6 +1235,8 @@ async def create_product(product_data: ProductCreate, current_admin: Admin = Dep
         
         return product
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1116,6 +1251,24 @@ async def update_product(product_id: str, product_data: ProductUpdate, current_a
         existing_product = await db.products.find_one({"id": product_id})
         if not existing_product:
             raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Validate category if being updated
+        if product_data.category:
+            category = await db.categories.find_one({"name": product_data.category})
+            if not category:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Category '{product_data.category}' does not exist"
+                )
+        
+        # Validate brand if being updated
+        if product_data.brand:
+            brand = await db.brands.find_one({"name": product_data.brand})
+            if not brand:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Brand '{product_data.brand}' does not exist"
+                )
         
         # Prepare update data
         update_data = product_data.dict(exclude_unset=True)
@@ -1171,12 +1324,34 @@ async def delete_product(product_id: str, current_admin: Admin = Depends(get_cur
 async def get_all_products_admin(
     current_admin: Admin = Depends(get_current_admin),
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, le=100)
+    limit: int = Query(default=50, le=100),
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    brand: Optional[str] = None,
+    in_stock: Optional[bool] = None
 ):
-    """Get all products with pagination (Admin only)"""
+    """Get all products with pagination and filtering (Admin only)"""
     try:
-        products = await db.products.find().skip(skip).limit(limit).to_list(length=None)
-        total_count = await db.products.count_documents({})
+        filter_query = {}
+        
+        if search:
+            filter_query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"tags": {"$in": [search.lower()]}}
+            ]
+        
+        if category:
+            filter_query["category"] = category
+            
+        if brand:
+            filter_query["brand"] = brand
+            
+        if in_stock is not None:
+            filter_query["in_stock"] = in_stock
+        
+        products = await db.products.find(filter_query).skip(skip).limit(limit).to_list(length=None)
+        total_count = await db.products.count_documents(filter_query)
         
         return {
             "products": [Product(**product) for product in products],
